@@ -1,0 +1,14 @@
+{
+  "name": "seo-monitor",
+  "version": "1.0.0",
+  "description": "Daily SEO monitor using Groq AI + GitHub Actions",
+  "main": "seo-monitor/run.js",
+  "scripts": {
+    "start": "node seo-monitor/run.js",
+    "test": "node seo-monitor/run.js"
+  },
+  "dependencies": {
+    "groq-sdk": "^0.7.0",
+    "nodemailer": "^6.9.13"
+  }
+}
