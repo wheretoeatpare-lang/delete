@@ -22,9 +22,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install openpyxl
+        run: pip install openpyxl gspread google-auth
 
       - name: Generate Weekly Excel Report
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
         run: python generate_report.py
 
       - name: Send Email with Attachment
@@ -44,6 +47,8 @@ jobs:
             Please find attached the weekly SEO report for the week of ${{ env.WEEK_LABEL }}.
 
             Sheets included: James, Jone, Bernard, Ken, Rosee, Adolf, Kae, Charles, Nicole
+
+            Leave statuses have been automatically pulled from the Web Team Planned Leaves sheet and marked on each person's tab.
 
             This email was sent automatically every Saturday.
           attachments: weekly_report.xlsx
