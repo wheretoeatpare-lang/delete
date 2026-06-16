@@ -2,7 +2,7 @@ import os
 import json
 import re
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, Font
 from datetime import datetime, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
@@ -10,14 +10,13 @@ from google.oauth2.service_account import Credentials
 # ── 1. Compute Mon-Fri dates for the current week ──────────────────────────
 today = datetime.today()
 monday = today - timedelta(days=today.weekday())
-week_dates = [monday + timedelta(days=i) for i in range(5)]  # Mon-Fri
+week_dates = [monday + timedelta(days=i) for i in range(5)]
 
 week_label  = f"{monday.strftime('%B %d')} - {week_dates[4].strftime('%d, %Y')}"
 date_header = f"{monday.strftime('%B %d')} - {week_dates[4].strftime('%d, %Y')} "
 
 print(f"Generating report for week: {week_label}")
 
-# Write week label to GitHub env for the email subject
 github_env = os.environ.get("GITHUB_ENV", "")
 if github_env:
     with open(github_env, "a") as f:
@@ -32,19 +31,17 @@ SCOPES = [
 creds_json     = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
 spreadsheet_id = os.environ.get("SPREADSHEET_ID", "")
 
-# leave_map = { "Rosee": { 0: "Sick Leave", 2: "Half Day" }, ... }
-# key = day index (0=Mon ... 4=Fri)
+# leave_map = { "Adolf": { 0: "On Leave" }, "Rosee": { 0: "Sick Leave" } ... }
 leave_map = {}
 
 def parse_leave_type(text, name_part):
     """
     Detect leave type from a calendar cell entry.
-    Rules (in priority order):
-      - bare name only           → On Leave
-      - contains SL / Sick       → Sick Leave
-      - contains HL / Half       → Half Day  (also handles "half-day", "(Half Day)")
-      - contains EL / Emergency  → Emergency Leave
-      - anything else            → On Leave  (name present = on leave)
+    - bare name only              → On Leave
+    - name -SL / Sick             → Sick Leave
+    - name (Half Day) / -HL       → Half Day
+    - name -EL / Emergency Leave  → Emergency Leave
+    - anything else               → On Leave
     """
     rest = text[len(name_part):].strip(" \t-–()")
     rest_up = rest.upper()
@@ -66,7 +63,6 @@ if creds_json and spreadsheet_id:
         creds      = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
         gc         = gspread.authorize(creds)
 
-        # Open tab matching current month e.g. "JUNE 2026"
         month_tab = monday.strftime("%B %Y").upper()
         print(f"Looking for sheet tab: {month_tab}")
 
@@ -79,7 +75,7 @@ if creds_json and spreadsheet_id:
 
         all_values = ws_gs.get_all_values()
 
-        # ── Map column index → weekday index (0=Mon…4=Fri) ──────────────
+        # Map column index → weekday index (0=Mon…4=Fri)
         header_row = all_values[1] if len(all_values) > 1 else []
         col_to_weekday = {}
         for ci, hdr in enumerate(header_row):
@@ -90,10 +86,9 @@ if creds_json and spreadsheet_id:
             elif h == "THURSDAY":  col_to_weekday[ci] = 3
             elif h == "FRIDAY":    col_to_weekday[ci] = 4
 
-        # Target day-of-month numbers for this Mon-Fri
+        # Target day-of-month → day index
         target_days = {wd.day: idx for idx, wd in enumerate(week_dates)}
 
-        # ── Scan every calendar data row ─────────────────────────────────
         for row in all_values[2:]:
             for ci, cell_text in enumerate(row):
                 cell_text = cell_text.strip()
@@ -106,10 +101,10 @@ if creds_json and spreadsheet_id:
                     continue
 
                 # First line is usually the date number
-                date_num = None
+                date_num  = None
                 name_lines = lines
                 try:
-                    date_num = int(lines[0])
+                    date_num   = int(lines[0])
                     name_lines = lines[1:]
                 except ValueError:
                     pass
@@ -122,12 +117,9 @@ if creds_json and spreadsheet_id:
                 for nl in name_lines:
                     if not nl:
                         continue
-
-                    # Extract the name token (letters only, before any suffix/bracket)
                     name_match = re.match(r"^([A-Za-z]+)", nl)
                     if not name_match:
                         continue
-
                     raw_name   = name_match.group(1).strip()
                     leave_type = parse_leave_type(nl, raw_name)
 
@@ -183,6 +175,8 @@ for template_name, names in sheets_config:
         new_ws.column_dimensions["A"].width = 28
 
         # ── Apply leave markings ──────────────────────────────────────
+        # Row 13 in all templates = percentage row (B13:F13)
+        # We overwrite that cell with leave text + color for affected days
         person_leaves = {}
         for lname, ldays in leave_map.items():
             if lname.lower() == name.lower():
@@ -198,6 +192,7 @@ for template_name, names in sheets_config:
             cell.value = leave_type
             color = LEAVE_COLORS.get(leave_type, "D9E1F2")
             cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+            cell.font = Font(bold=True)
             print(f"  Marked {name} → {col}13 = '{leave_type}'")
 
 wb.save("weekly_report.xlsx")
