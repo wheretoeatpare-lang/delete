@@ -1,0 +1,46 @@
+name: Weekly SEO Report - Email Every Saturday
+
+on:
+  schedule:
+    - cron: '0 8 * * 6'  # Every Saturday at 8:00 AM UTC
+  workflow_dispatch:       # Allow manual trigger anytime
+
+jobs:
+  generate-and-send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install openpyxl
+
+      - name: Generate Weekly Excel Report
+        run: python generate_report.py
+
+      - name: Send Email with Attachment
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.EMAIL_USER }}
+          subject: "Weekly SEO Report - Week of ${{ env.WEEK_LABEL }}"
+          body: |
+            Hi there!
+
+            Please find attached the weekly SEO report for the week of ${{ env.WEEK_LABEL }}.
+
+            Sheets included: James, Jone, Bernard, Ken, Rosee, Adolf, Kae, Charles, Nicole
+
+            This email was sent automatically every Saturday.
+          attachments: weekly_report.xlsx
