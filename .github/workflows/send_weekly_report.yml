@@ -2,8 +2,11 @@ name: Weekly SEO Report - Email Every Saturday
 
 on:
   schedule:
-    - cron: '0 8 * * 6'  # Every Saturday at 8:00 AM UTC
+    - cron: '0 0 * * 6'  # Every Saturday at 8:00 AM Manila time (UTC+8)
   workflow_dispatch:       # Allow manual trigger anytime
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   generate-and-send:
@@ -11,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.4.0
         with:
           python-version: '3.11'
 
@@ -25,7 +28,7 @@ jobs:
         run: python generate_report.py
 
       - name: Send Email with Attachment
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v4
         with:
           server_address: smtp.gmail.com
           server_port: 465
